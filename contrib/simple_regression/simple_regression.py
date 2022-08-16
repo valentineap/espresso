@@ -1,5 +1,5 @@
 from cofi_espresso import EspressoProblem
-
+import numpy as np
 
 class SimpleRegression(EspressoProblem):
     """Forward simulation class

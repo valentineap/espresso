@@ -5,6 +5,6 @@ Code inside this file will be executed when this submodule is imported.
 For contributors: feel free to add your initialisation code here if needed.
 """
 
-from .polynomial_curve import *
+from .simple_regression import *
 
-__all__ = [ "PolynomialCurve" ]
+__all__ = [ "SimpleRegression" ]
