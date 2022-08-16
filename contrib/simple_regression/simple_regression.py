@@ -12,57 +12,56 @@ class SimpleRegression(EspressoProblem):
         so that you can access them in the other functions see the following as an 
         example (suggested) usage of `self.params`
         """
-        # if example_number == 0:
-        #     self.params["some_attribute"] = some_value_0
-        #     self.params["another_attribte"] = another_value_0
-        # elif example_number == 1:
-        #     self.params["some_attribute"] = some_value_1
-        #     self.params["another_attribte"] = another_value_1
-        # else:
-        #     raise ValueError(
-        #         "The example number supplied is not supported, please consult "
-        #         "Espresso documentation at "
-        #         "https://cofi-espresso.readthedocs.io/en/latest/contrib/index.html "
-        #         "for problem-specific metadata, e.g. number of examples provided"
-        #     )
+        if self.example_number == 0:
+            self._xp = xp1.copy()
+            self._yp = yp1.copy()
+            self._m = np.array([0.5,2])
+            self._basis = 'polynomial'
+        elif self.example_number == 1:
+            self._xp = xp2.copy()
+            self._yp = yp2.copy()
+            self._m = np.array([1.,-0.2,0.5,0.3])
+            self._basis = 'polynomial'
+        elif self.example_number == 2:
+            self._xp = xp3.copy()
+            self._yp = yp3.copy()
+            self._m = np.array([1,0,0.3,-0.2,0,0,0.7,0.,0.,0.3,0.,0.,0.,0.,-.2])
+            self._basis = 'fourier'
+        elif self.example_number == 3:
+            self._xp = xp4.copy()
+            self._yp = yp4.copy()
+            self._m = np.array([0.,2,-.3,-.6])
+            self._basis = 'polynomial'
+        elif self.example_number == 4:
+            self._xp = xp5.copy()
+            self._yp = yp5.copy()
+            self._m = np.array([0.3,0.3,0.,-0.2,0.5,-.8,0.1,0.125])
+            self._basis = 'polynomial'
+        else:
+            raise ValueError(
+                "The example number supplied is not supported, please consult "
+                "Espresso documentation at "
+                "https://cofi-espresso.readthedocs.io/en/latest/contrib/index.html "
+                "for problem-specific metadata, e.g. number of examples provided"
+            )
 
 
     def suggested_model(self):
-        if self.example_number == 0:
-            return np.array([0.5,2]), 'polynomial'
-        elif self.example_number == 1:
-            return np.array([1.,-0.2,0.5,0.3]),'polynomial'
-        elif self.example_number == 2:
-            return np.array([1,0,0.3,-0.2,0,0,0.7,0.,0.,0.3,0.,0.,0.,0.,-.2]),'fourier'
-        elif self.example_number == 3:
-            return np.array([0.,2,-.3,-.6]), 'polynomial'
-        elif self.example_number == 4:
-            return np.array([0.3,0.3,0.,-0.2,0.5,-.8,0.1,0.125]), 'polynomial'
-        else:
-            raise ValueError("The example number supplied is not supported")
+        return self._m.copy()
     
     def data(self):
-        if self.example_number==0:
-            return yp1.copy()
-        elif self.example_number==1:
-            return yp2.copy()
-        elif self.example_number==2:
-            return yp3.copy()
-        elif self.example_number==3:
-            return yp4.copy()
-        elif self.example_number==4:
-            return yp5.copy()
-        else:
-            raise ValueError("The example number supplied is not supported")
+        return self._yp.copy()
 
     def forward(self, model, with_jacobian=False):
+        d = curveFittingFwd(self._m,self._xp,self._basis)
         if with_jacobian:
-            raise NotImplementedError           # optional
+            return d, self.jacobian(model)
         else:
-            raise NotImplementedError           # TODO implement me
+            return d
     
     def jacobian(self, model):
-        raise NotImplementedError               # optional
+        nModel = model.shape[0]
+        return curveFittingJac(self._x,nModel,self._basis)
 
     def plot_model(self, model):
         raise NotImplementedError               # optional
@@ -194,7 +193,7 @@ def curveFittingFwd(model, xpts, basis='polynomial',domainLength = 1.):
     else:
         return y
 
-def curveFittingInv(xpts,ypts,nModelParameters, basis='polynomial',domainLength=1.,regularisation=None,priorModel=None,returnPosteriorCovariance=False):
+def curveFittingJac(xpts,nModelParameters, basis='polynomial',domainLength=1.):
     singlePoint=False
     if domainLength<0:raise ValueError("Argument 'domainLength' must be positive")
     if type(xpts) is type([]):xpts=np.array(xpts)
@@ -205,11 +204,6 @@ def curveFittingInv(xpts,ypts,nModelParameters, basis='polynomial',domainLength=
     except AttributeError:
         singlePoint = True
         npts = 1
-    try:
-        if ypts.shape[0] != npts: raise ValueError("Argument 'ypts' should have same dimension as 'xpts'")
-        if len(ypts.shape)!=1: raise ValueError("Argument 'ypts' should be a 1-D array")
-    except AttributeError:
-        if not singlePoint: raise ValueError("Argument 'ypts' should have same dimension as 'xpts'")
 
     if basis == 'polynomial':
         G = np.zeros([npts,nModelParameters])
@@ -230,86 +224,6 @@ def curveFittingInv(xpts,ypts,nModelParameters, basis='polynomial',domainLength=
         y = np.zeros([npts])
         for ipt in range(0,npts):
             G[ipt,max(0,np.searchsorted(bounds,xpts[ipt])-1)] = 1.
-    GTG = G.T.dot(G)
-    if regularisation is not None:
-        if regularisation<0: raise ValueError("Argument 'regularisation' should be positive or None")
-        GTG+=regularisation*np.eye(GTG.shape[0])
-        if priorModel is None:
-            mp = np.zeros(nModelParameters)
-        else:
-            if type(priorModel) is type([]): priorModel = np.array(priorModel)
-            try:
-                if priorModel.shape[0]!=nModelParameters: raise ValueError ("Argument 'priorModel' should match requested number of model parameters")
-                if len(priorModel.shape)!=1: raise ValueError ("Argument 'priorModel' should be a 1-D array")
-            except AttributeError:
-                if nModelParameters>1:raise ValueError("Argument 'priorModel' should match requested number of model parameters")
-            mp = priorModel
     else:
-        mp = np.zeros(nModelParameters)
-    if returnPosteriorCovariance:
-        return mp+np.linalg.inv(GTG).dot(G.T.dot(ypts-G.dot(mp))), np.linalg.inv(GTG)
-    else:
-        return mp+np.linalg.inv(GTG).dot(G.T.dot(ypts-G.dot(mp)))
-
-def generateExampleDatasets():
-    np.random.seed(42)
-    # Example 1: Straight line
-    model = np.array([0.5,2])
-    xpts = np.random.uniform(0,1,size=20)
-    xpts.sort()
-    ypts = curveFittingFwd(model,xpts,'polynomial')+np.random.normal(0,0.1,size=20)
-    fp = open('curve_fitting_1.dat','w')
-    fp.write('# x       y        sigma\n')
-    for i in range(0,20):
-        fp.write("%.3f    %.3f    %.3f\n"%(xpts[i],ypts[i],0.1))
-    fp.close()
-
-    # Example 2: Cubic
-    model = np.array([1.,-0.2,0.5,0.3])
-    xpts = np.random.uniform(0,1,size=25)
-    xpts.sort()
-    ypts = curveFittingFwd(model,xpts,'polynomial')+np.random.normal(0,0.1,size=25)
-    fp = open('curve_fitting_2.dat','w')
-    fp.write('# x       y        sigma\n')
-    for i in range(0,25):
-        fp.write("%.3f    %.3f    %.3f\n"%(xpts[i],ypts[i],0.1))
-    fp.close()
-
-
-    # Example 3: Sinusoid
-    model = np.array([1,0,0.3,-0.2,0,0,0.7,0.,0.,0.3,0.,0.,0.,0.,-.2])
-    xpts = np.random.uniform(0,1,size=50)
-    xpts.sort()
-    ypts = curveFittingFwd(model,xpts,'fourier')+np.random.normal(0,0.1,size=50)
-    fp = open('curve_fitting_3.dat','w')
-    fp.write('# x       y        sigma\n')
-    for i in range(0,50):
-        fp.write("%.3f    %.3f    %.3f\n"%(xpts[i],ypts[i],0.1))
-    fp.close()
-
-    # Example 4: Small dataset
-    model = np.array([0.,2,-.3,-.6])
-    xpts = np.random.uniform(0,1,size=5)
-    xpts.sort()
-    ypts = curveFittingFwd(model,xpts,'polynomial')+np.random.normal(0,0.05,size=5)
-    fp = open('curve_fitting_4.dat','w')
-    fp.write('# x       y        sigma\n')
-    for i in range(0,5):
-        fp.write("%.3f    %.3f    %.3f\n"%(xpts[i],ypts[i],0.05))
-    fp.close()
-
-    # Example 5: Incomplete dataset
-    model = np.array([0.3,0.3,0.,-0.2,0.5,-.8,0.1,0.125])
-    xpts = np.zeros([30])
-    xpts[0:25] = np.random.uniform(0,0.3,size=25)
-    xpts[25:] = np.random.uniform(0.9,1.,size=5)
-    xpts.sort()
-    ypts = curveFittingFwd(model,xpts,'polynomial')+np.random.normal(0,0.1,size=30)
-    fp = open('curve_fitting_5.dat','w')
-    fp.write('# x       y        sigma\n')
-    for i in range(0,30):
-        fp.write("%.3f    %.3f    %.3f\n"%(xpts[i],ypts[i],0.1))
-    fp.close()
-
-
-    return xpts,ypts
+        raise ValueError("Unsupported basis")
+    return G
