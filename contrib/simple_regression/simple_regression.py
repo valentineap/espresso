@@ -1,42 +1,61 @@
-from cofi_espresso import EspressoProblem
 import numpy as np
+from cofi_espresso import EspressoProblem
+
+problem_title = "Simple 1D regression" 
+problem_short_description = "This example includes various small 1D regression (curve-fitting) " \
+                            "problems. Several different forms of basis function are supported: " \
+                            "polynomial, Fourier and discrete." 
+
+author_names = ["Andrew Valentine"]  
+
+contact_name = "Andrew Valentine" 
+contact_email = "andrew.valentine@durham.ac.uk"
+
+citations = [] 
+
+linked_sites = [] 
 
 class SimpleRegression(EspressoProblem):
     """Forward simulation class
     """
 
-    def __init__(self, example_number=0):
+    def __init__(self, example_number=1):
         super().__init__(example_number)
-
-        """you might want to set other useful example specific parameters here
-        so that you can access them in the other functions see the following as an 
-        example (suggested) usage of `self.params`
-        """
-        if self.example_number == 0:
+        if self.example_number == 1:
             self._xp = xp1.copy()
             self._yp = yp1.copy()
             self._m = np.array([0.5,2])
             self._basis = 'polynomial'
-        elif self.example_number == 1:
+            self._desc = "Fitting a straight line to data"
+            self._sigma = 0.1
+        elif self.example_number == 2:
             self._xp = xp2.copy()
             self._yp = yp2.copy()
             self._m = np.array([1.,-0.2,0.5,0.3])
             self._basis = 'polynomial'
-        elif self.example_number == 2:
+            self._desc = "Fitting a cubic polynomial to data"
+            self._sigma = 0.1
+        elif self.example_number == 3:
             self._xp = xp3.copy()
             self._yp = yp3.copy()
             self._m = np.array([1,0,0.3,-0.2,0,0,0.7,0.,0.,0.3,0.,0.,0.,0.,-.2])
             self._basis = 'fourier'
-        elif self.example_number == 3:
+            self._desc = "Fitting a Fourier series to data"
+            self._sigma = 0.1
+        elif self.example_number == 4:
             self._xp = xp4.copy()
             self._yp = yp4.copy()
             self._m = np.array([0.,2,-.3,-.6])
             self._basis = 'polynomial'
-        elif self.example_number == 4:
+            self._desc = "Fitting a polynomial to a very small dataset"
+            self._sigma = 0.05
+        elif self.example_number == 5:
             self._xp = xp5.copy()
             self._yp = yp5.copy()
             self._m = np.array([0.3,0.3,0.,-0.2,0.5,-.8,0.1,0.125])
             self._basis = 'polynomial'
+            self._desc = "Fitting a polynomial to a dataset with a gap"
+            self._sigma = 0.1
         else:
             raise ValueError(
                 "The example number supplied is not supported, please consult "
@@ -45,13 +64,38 @@ class SimpleRegression(EspressoProblem):
                 "for problem-specific metadata, e.g. number of examples provided"
             )
 
+    @property
+    def description(self):
+        return self._desc
 
-    def suggested_model(self):
+    @property
+    def model_size(self):
+        return self._m.size
+
+    @property
+    def data_size(self):
+        return self._yp.size
+
+    @property
+    def good_model(self):
         return self._m.copy()
+
+    @property
+    def starting_model(self):
+        return np.zeros_like(self._m)
     
+    @property
     def data(self):
         return self._yp.copy()
 
+    @property
+    def covariance_matrix(self):
+        return self._sigma**2 * np.eye(self.data_size)
+
+    @property
+    def inverse_covariance_matrix(self):
+        return (1/self._sigma**2) * np.eye(self.data_size)
+        
     def forward(self, model, with_jacobian=False):
         d = curveFittingFwd(self._m,self._xp,self._basis)
         if with_jacobian:
@@ -61,13 +105,22 @@ class SimpleRegression(EspressoProblem):
     
     def jacobian(self, model):
         nModel = model.shape[0]
-        return curveFittingJac(self._x,nModel,self._basis)
+        return curveFittingJac(self._xp,nModel,self._basis)
 
     def plot_model(self, model):
         raise NotImplementedError               # optional
     
-    def plot_data(self, data):
+    def plot_data(self, data, data2=None):
         raise NotImplementedError               # optional
+
+    def misfit(self, data, data2):              # optional
+        raise NotImplementedError
+
+    def log_likelihood(self,data,data2):        # optional
+        raise NotImplementedError
+    
+    def log_prior(self, model):                 # optional
+        raise NotImplementedError
 
 # The following arrays define the 'sampling points' used in various examples
 # In principle we could generate these on-the-fly but using hard-coded values
@@ -197,7 +250,6 @@ def curveFittingJac(xpts,nModelParameters, basis='polynomial',domainLength=1.):
     singlePoint=False
     if domainLength<0:raise ValueError("Argument 'domainLength' must be positive")
     if type(xpts) is type([]):xpts=np.array(xpts)
-    if type(ypts) is type([]):ypts=np.array(ypts)
     try:
         npts = xpts.shape[0]
         if len(xpts.shape)!=1: raise ValueError("Argument 'xpts' should be a 1-D array")

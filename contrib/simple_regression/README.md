@@ -1,4 +1,4 @@
-# Polynomial Curve
+# Simple Regression
 
 <!-- Please write anything you'd like to explain about the forward problem here -->
 
@@ -39,7 +39,7 @@ To complete this contribution, here are some ideas on what to do next:
    render some of the information in a more structured manner.
 - [ ] **Modify [LICENCE](LICENCE)**. The default one we've used is a 2-clauss BSD licence. 
    Feel free to replace the content with a licence that suits you best.
-- [ ] **Write code in [polynomial_curve.py](polynomial_curve.py) (and [__init__.py](__init__.py) if
+- [ ] **Write code in [simple_regression.py](simple_regression.py) (and [__init__.py](__init__.py) if
    necessary)**. Some basic functions have been defined in the template - these are the
    standard interface we'd like to enforce in Espresso. You'll see
    clearly some functionalities that are required to implement and others that are
@@ -69,11 +69,11 @@ import your contribution in the following ways.
 $ pwd                            # check you are in the right folder
 <path-to-espresso>/contrib
 $ python
->>> from polynomial_curve import ExampleName   # import it this way
+>>> from simple_regression import ExampleName   # import it this way
 ```
 
 (Creating temporary Python file)
 ```python
 # file contrib/tmp.py            # create tmp file in the right folder
-from polynomial_curve import ExampleName       # import it this way
+from simple_regression import ExampleName       # import it this way
 ```
